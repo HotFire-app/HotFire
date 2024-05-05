@@ -1,0 +1,95 @@
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+        <meta name="viewport" content="width=device-width,user-scalable=no">
+        <script src="build/mp4-muxer.js"></script>
+        <script>
+           
+            async function draw(){
+               try {
+                let t1=document.timeline.currentTime;
+                let frameCounter=0;
+                const muxer = new Mp4Muxer.Muxer({
+                    target: new Mp4Muxer.ArrayBufferTarget(),
+                    video: {
+                        codec: 'avc',
+                        width: canvas.width,
+                        height: canvas.height,
+                        frameRate: 30
+                    },
+                    fastStart:"in-memory",
+                    firstTimestampBehavior: 'offset'
+                });
+                // 音视频编码器，这里使用的是WebCodese API
+                const videoEncoder = new VideoEncoder({
+                    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+                    error: e => console.error(e)
+                });
+                videoEncoder.configure({
+                    codec: 'avc1.640029',
+                    width: canvas.width,
+                    height: canvas.height,
+                    bitrate: 2_000_000
+                });
+                let ctx=canvas.getContext("2d");
+                while(frameCounter<300){
+                    ctx.clearRect(0,0,canvas.width,canvas.height)
+                    ctx.font = "148px serif";
+                    ctx.fillStyle="#fff000";
+                    ctx.fillText(frameCounter, 200, 200);
+                    let frame = new VideoFrame(canvas, {
+                        timestamp: (frameCounter * 1000 / 30) * 1000
+                    });
+                    videoEncoder.encode(frame, { 
+                        keyFrame: frameCounter % 30 === 0 
+                    });
+                    frame.close();
+                    console.log(frameCounter++);
+                }
+                await videoEncoder?.flush();
+                muxer.finalize();
+
+                let buffer = muxer.target?.buffer;
+                let t2=document.timeline.currentTime;
+                alert((t2-t1)+"ms");
+                var blobUrl = URL.createObjectURL(new Blob([buffer]));
+                video.src=blobUrl;
+                return;
+               } catch (error) {
+                alert(error);
+               }
+                
+                /*
+                const width=1920;
+                const height=1080;
+                cvs.width=width;
+                cvs.height=height*2;
+                cvs2.width=width;
+                cvs2.height=height;
+                var t1=new Date().getTime();
+                const ctx=cvs.getContext("2d");
+                ctx.imageSmoothingQuality="high";
+                ctx.drawImage(sample,0,0);
+                
+                const frame = ctx.getImageData(0, 0, width,height);
+                const frame2 = ctx.getImageData(0, height, width,height);
+                const data = frame.data;
+                const data2=frame2.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i+3]=data2[i];
+                }
+                const ctx2=cvs2.getContext("2d");
+                ctx2.putImageData(frame, 0, 0);
+                var t2=new Date().getTime();
+                output.innerText=(t2-t1+"ms");
+                requestAnimationFrame(draw);
+                return;*/
+            }
+        </script>
+    </head>
+    <body onload="draw()">
+        <canvas id="canvas" width="1920" height="1080" style=""></canvas>
+        <video id="video" controls></video>
+        <div id="output"></div>
+    </body>
+</html>
